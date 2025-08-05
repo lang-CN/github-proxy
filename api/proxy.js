@@ -1,35 +1,32 @@
 import { createProxyMiddleware } from 'http-proxy-middleware';
 
-// 配置 Git 代理（针对 GitHub 的 HTTPS 地址）
 const proxy = createProxyMiddleware({
   target: 'https://github.com',
   changeOrigin: true,
   pathRewrite: {
-    '^/api/proxy': '', // 移除代理路径前缀
+    // 移除路径中的 "/api/proxy" 前缀
+    '^/api/proxy': '',
   },
-  // 支持 Git 所需的 HTTP 方法（包括 PUT、POST 等用于 push 的方法）
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  // 保留原始请求头（尤其是认证信息）
-  preserveHeaderKeyCase: true,
-  headers: {
-    'User-Agent': 'git/2.30.0', // 模拟 Git 客户端 UA，避免被拒绝
-  },
-  // 处理大文件推送（需注意 Vercel 函数超时限制）
+  // 处理特殊的 Git 协议头
   onProxyReq: (proxyReq, req, res) => {
-    // 传递认证信息（如 GitHub 的 token）
+    // 保留原始请求头
     if (req.headers.authorization) {
       proxyReq.setHeader('Authorization', req.headers.authorization);
     }
+    // 处理 Git 推送所需的内容长度头
+    if (req.headers['content-length']) {
+      proxyReq.setHeader('Content-Length', req.headers['content-length']);
+    }
   },
-  // 延长超时时间（Vercel 最大超时为 10 秒，大型推送可能失败）
+  // 延长超时时间（Vercel 最大支持 10 秒）
   timeout: 10000,
 });
 
 export default function handler(req, res) {
-  // 允许跨域（可选，根据需求配置）
+  // 允许跨域请求
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   // 处理 OPTIONS 预检请求
   if (req.method === 'OPTIONS') {
@@ -37,6 +34,11 @@ export default function handler(req, res) {
   }
   
   // 执行代理
-  return proxy(req, res);
+  return proxy(req, res, (err) => {
+    if (err) {
+      console.error('Proxy error:', err);
+      return res.status(500).json({ error: '代理请求失败', details: err.message });
+    }
+  });
 }
     
