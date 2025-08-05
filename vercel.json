@@ -1,11 +1,19 @@
 {
-  "rewrites": [
-    { "source": "/api/proxy(.*)", "destination": "/api/proxy.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "version": 2,
+  "routes": [
+    {
+      "src": "/api/proxy(.*)",
+      "dest": "/api/proxy.js$1",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/api/proxy(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
@@ -13,6 +21,10 @@
       ]
     }
   ],
-  "buildCommand": "echo 'No build needed'",
-  "outputDirectory": "."
+  "functions": {
+    "api/proxy.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  }
 }
